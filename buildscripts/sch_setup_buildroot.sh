@@ -42,7 +42,7 @@ cp -r /src/custompackages/package/* /openmiko/build/buildroot-2016.02/package/
 # The linux configuration is set inside the ingenic_t20_defconfig
 # using BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE
 
-cp /src/config/ingenic_t20_defconfig configs/
+cp /src/config/ingenic_t20_defconfig_sch configs/ingenic_t20_defconfig
 cp /src/config/busybox.config package/busybox
 cp /src/config/uClibc-ng.config package/uclibc
 
@@ -58,7 +58,7 @@ make ingenic_t20_defconfig
 
 # We just loaded it but these commands are how you save it back (here for reference)
 # Technically should be a no-op
-make savedefconfig BR2_DEFCONFIG=/src/config/ingenic_t20_defconfig
+# make savedefconfig BR2_DEFCONFIG=/src/config/ingenic_t20_defconfig
 # make linux-update-defconfig
 
 # Start the build process
