@@ -1,3 +1,0 @@
-# OpenMiko MicroPython API
-
-# Development

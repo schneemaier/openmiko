@@ -50,7 +50,8 @@ KERNEL="$IMAGES/uImage.lzma"
 PADDED_KERNEL="$IMAGES/uImagePadded.lzma"
 
 ROOTFSFILE="$IMAGES/rootfs.tar.xz"
-JFFSROOTIMG="$IMAGES/rootfs.jffs2"
+JFFSROOTIMG="$IMAGES/rootfs.openmiko.jffs2"
+SQUASHFSROOTIMG="$IMAGES/rootfs.squashfs"
 
 
 KERNEL_MAXSIZE=$((16#200000))
@@ -93,19 +94,25 @@ fi
 
 
 # Combine kernel and rootfs into one file and pad it to total size of flash
-KERNEL_AND_ROOT="$IMAGES/kernel_and_root.bin"
-cat $PADDED_KERNEL $JFFSROOTIMG > $KERNEL_AND_ROOT
+KERNEL_AND_ROOTJFFS2="$IMAGES/kernel_and_root.jffs2.bin"
+KERNEL_AND_ROOTSQASHFS="$IMAGES/kernel_and_root.squashfs.bin"
+cat $PADDED_KERNEL $JFFSROOTIMG > $KERNEL_AND_ROOTJFFS2
+cat $PADDED_KERNEL $SQUASHFSROOTIMG > $KERNEL_AND_ROOTSQUASHFS
 
 echo "Maximum size of flash image: $FLASH_MAXSIZE"
-truncate -s $FLASH_MAXSIZE $KERNEL_AND_ROOT
+truncate -s $FLASH_MAXSIZE $KERNEL_AND_ROOTJFFS2
+truncate -s $FLASH_MAXSIZE $KERNEL_AND_ROOTSQUASHFS
 
 
 # Make an image for flashing
-OUTFILE="${RELEASE_DIR}/openmiko_firmware.bin"
-$MKIMAGE -A MIPS -O linux -T firmware -C none -a 0 -e 0 -n jz_fw -d $KERNEL_AND_ROOT $OUTFILE
+OUTFILE1="${RELEASE_DIR}/openmiko_firmware.jffs2.bin"
+OUTFILE2="${RELEASE_DIR}/openmiko_firmware.squashfs.bin"
+$MKIMAGE -A MIPS -O linux -T firmware -C none -a 0 -e 0 -n jz_fw -d $KERNEL_AND_ROOTJFFS2 $OUTFILE1
+$MKIMAGE -A MIPS -O linux -T firmware -C none -a 0 -e 0 -n jz_fw -d $KERNEL_AND_ROOTSQUASHFS $OUTFILE2
 
 
-cp $OUTFILE $RELEASE_DIR/demo.bin
+cp $OUTFILE1 $RELEASE_DIR/demo.bin
+cp $OUTFILE2 $RELEASE_DIR/demo.squashfs.bin
 echo "Firmware created: $RELEASE_DIR/demo.bin"
 
 cp $JFFSROOTIMG $RELEASE_DIR
