@@ -36,7 +36,7 @@ start_camera() {
 	modprobe tx-isp isp_clk=100000000
 
 	if [ "$sensor" = "jxf23" ]; then
-	  insmod /driver/sensor_jxf23.ko data_interface=2 pwdn_gpio=-1 reset_gpio=18 sensor_gpio_func=0
+	  insmod /lib/modules/3.10.14/kernel/drivers/media/platform/sensors/jxf23/sensor_jxf23.ko data_interface=2 pwdn_gpio=-1 reset_gpio=18 sensor_gpio_func=0
 	else
 	  insmod /lib/modules/3.10.14/kernel/drivers/media/platform/sensors/jxf22/sensor_jxf22.ko data_interface=2 pwdn_gpio=-1 reset_gpio=18 sensor_gpio_func=0
 	fi

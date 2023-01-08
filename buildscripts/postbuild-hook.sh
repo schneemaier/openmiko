@@ -95,7 +95,7 @@ fi
 
 # Combine kernel and rootfs into one file and pad it to total size of flash
 KERNEL_AND_ROOTJFFS2="$IMAGES/kernel_and_root.jffs2.bin"
-KERNEL_AND_ROOTSQASHFS="$IMAGES/kernel_and_root.squashfs.bin"
+KERNEL_AND_ROOTSQUASHFS="$IMAGES/kernel_and_root.squashfs.bin"
 cat $PADDED_KERNEL $JFFSROOTIMG > $KERNEL_AND_ROOTJFFS2
 cat $PADDED_KERNEL $SQUASHFSROOTIMG > $KERNEL_AND_ROOTSQUASHFS
 
