@@ -20,14 +20,17 @@ then
 fi
 
 
-echo "Starting root overlay setp"
+echo "Starting full root buildout"
 
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 
 echo "Mounted core filesystems"
 
+
+
 /bin/busybox --install /bin
+
 
 setup_sdcard_access() {
 	mkdir -p /sdcard
@@ -64,6 +67,7 @@ if [[ -f $OPENMIKO_CONFIG_FILE ]]; then
 	. $OPENMIKO_CONFIG_FILE
 fi
 
+
 if [[ "$ENABLE_DEBUG" == "1" ]]; then
 	echo "Enabling kernel initramfs debug log to sdcard"
 	LOG_FILE="/sdcard/initramfs_output.log"
@@ -74,6 +78,80 @@ if [[ "$ENABLE_DEBUG" == "1" ]]; then
 	exec 1>/root/stdout_and_stderr.pipe
 	exec 2>/root/stdout_and_stderr.pipe
 fi
+
+
+clear_unused_rootfs_space() {
+	# The rootfs, appfs, drivers Wyze partitions have a total size of 8978432.
+	# This is the most I can write with a stock u-boot bootloader.
+	# However the mtd partition is 13828096 bytes and runs into the old config partition
+	# This causes JFFS mount issues because when JFFS tries to mount it reads some of
+	# the old stuff and corrupts things.
+	#
+	# To fix this we will zero out the unused blocks. After they are zeroed
+	# we will mount the jffs filesystem which will autocreate CLEANMARKER
+	# blocks.
+	#
+	# <mtdblock2 size> - <rootfs+appfs+drivers size> = <remainder>
+	#
+	# 13828096 bytes - 8978432 bytes = 4849664 bytes
+	# 
+	# 4849664 bytes in 32768 byte blocks is:
+	#
+	# 4849664 / 32768 = 148 blocks
+	#
+	# This command writes zeros
+	# dd if=/dev/zero of=/dev/mtdblock2 seek=274 count=148 bs=32768
+	#
+	# This one actually writes clean blocks
+	# New versions of flash_erase use the offset in blocks.
+	# Older ones like we have need it in bytes
+	# flash_erase --jffs2 /dev/mtd2 274 148
+
+	# Check the MD5 of the first block (32768 bytes)
+	UNUSED_ROOTFS_MD5SUM=`dd if=/dev/mtdblock2 skip=274 bs=32768 count=1 status=none | md5sum | cut -d ' ' -f 1`
+
+	if [[ "$UNUSED_ROOTFS_MD5SUM" != "2e2f3362dc6f14322e25bdd71dc38223" ]]; then
+		echo "Wiping unused flash. UNUSED_ROOTFS_MD5SUM: $UNUSED_ROOTFS_MD5SUM"
+
+		dd if=/dev/zero of=/dev/mtdblock2 seek=274 count=148 bs=32768
+
+		if [[ $? == 0 ]]; then
+			echo "Flash successfully wiped"			
+		fi
+	fi
+}
+clear_unused_rootfs_space
+
+mkdir -p /jffsroot
+
+# This mount will cause the zero'ed out blocks to turn into jffs2 cleanblocks
+# that look like this hexdump:
+#
+# 0000000 1985 2003 000c 0000 b0b1 e41e ffff ffff
+# 0000010 ffff ffff ffff ffff ffff ffff ffff ffff
+# *
+# 0008000 1985 2003 000c 0000 b0b1 e41e ffff ffff
+# 0008010 ffff ffff ffff ffff ffff ffff ffff ffff
+# *
+# 0010000 1985 2003 000c 0000 b0b1 e41e ffff ffff
+# 0010010 ffff ffff ffff ffff ffff ffff ffff ffff
+
+mount -t jffs2 /dev/mtdblock2 /jffsroot
+echo "Mounted jffsroot"
+
+find /jffsroot
+
+mkdir -p /newroot
+
+# Setup zram root file system. Use 4K blocks because zram
+# does not include any option to control block size. It is hard-coded.
+
+#echo 48M > /sys/block/zram0/disksize
+#reducing the zram0 size to leave more ram for applications
+echo 40M > /sys/block/zram0/disksize
+
+busybox mke2fs /dev/zram0 -b 4096
+mount /dev/zram0 /newroot
 
 # Checks for a file and if present writes a new bootloader
 upgrade_bootloader() {
@@ -127,26 +205,45 @@ wipe_rootfs_mtd_partition() {
 }
 wipe_rootfs_mtd_partition
 
+
+
+
+# Unarchive the root file system to the new root directory
+tar -xvf /jffsroot/rootfs.tar.xz -C /newroot
+
+if [ $? != 0 ]
+then
+  echo "Error: Extracting root filesystem failed."
+  echo "This happens on occasion from a bad flash. Try flashing again."
+
+  echo "md5sum of /jffsroot/rootfs.tar.xz: "
+  md5sum /jffsroot/rootfs.tar.xz
+  rm -rf /jffsroot/*
+
+  exec /bin/sh
+  exit 1
+fi
+
+umount /jffsroot
+
 #unmount sdcard if mounted
 if [ -e /dev/mmcblk0p1 ]; then
   umount /sdcard
 fi
 
-rm -r /sdcard
+rm -rf /newroot/dev
+rm -rf /newroot/sys
 
-echo "Mounting real root filesystem...."
-
-mkdir /rom
-mount -t squashfs /dev/mtdblock2 /rom
-mkdir /config
-mount -t jffs2 /dev/mtdblock3 /config
-mkdir /newroot
-mount -t overlayfs -o lowerdir=/rom,upperdir=/config/overlay overlayfs /newroot
+mkdir /newroot/dev
+mkdir /newroot/sys
 
 mount --move /dev /newroot/dev
 mount --move /sys /newroot/sys
-mount --move /config /newroot/config
 mount --move /proc /newroot/proc
+
+
+#/bin/busybox --install -s
+# ls -i /
 
 echo "Switching root to /newroot"
 
@@ -156,3 +253,11 @@ exec 2>/dev/console
 
 # switch_root moves already mounted /proc, /dev, /sys and /run to newroot
 exec busybox switch_root /newroot /sbin/init
+
+
+# /sbin/init can only be started as PID 1 but we are already PID 1
+# The solution is to execute `exec /sbin/init` while we are still inside
+# Will inherit the PID (PID 1)
+
+#echo "Starting /sbin/init"
+#exec /sbin/init $*
