@@ -13,7 +13,11 @@ IMAGES="${BASE_DIR}/images"
 HOST_DIR=${HOST_DIR:-/openmiko/build/buildroot-2016.02/output/host}
 TARGET_DIR=${TARGET_DIR:-/openmiko/build/buildroot-2016.02/output/target}
 
+#remove not needed modul. If the modul is disabled in the config, the other moduls are not built :(
 rm -rf "${TARGET_DIR}/lib/modules/3.10.14/kernel/drivers/net/wireless/rtl818x/rtl8188eu"
+
+# remove /var/log symlink. Due to overlayfs bug it is not possible to modify it. It is recreated on boot in the overlayfs
+rm -rf "${TARGET_DIR}/var/log"
 
 cd /src
 GIT_REVISION=$(git rev-parse --quiet --short HEAD)

@@ -1,23 +1,30 @@
 #!/bin/sh
 set -x
 
+# Create log symlink, but delete the exisitng one first
+# this symlink is removed from the root filesystem
+rm /var/log
+ln -s /tmp /var/log
+
 . /usr/bin/libgpio.sh
 gpio_select_gpiochip 0
 
 SD_PARTITION=/dev/mmcblk0p1
 SD_FILESYSTEM=vfat
-if [[ -f /etc/openmiko.conf ]]; then
-	. /etc/openmiko.conf
 
-elif [[ -f /config/overlay/etc/openmiko.conf ]]; then
-	. /config/overlay/etc/openmiko.conf
-fi
+# Not sure why this is needed, will remove later
+#if [[ -f /etc/openmiko.conf ]]; then
+#	. /etc/openmiko.conf
+#elif [[ -f /config/overlay/etc/openmiko.conf ]]; then
+#	. /config/overlay/etc/openmiko.conf
+#fi
 
 
+# May need to be removed
 # /etc/dropbear is a symbolic link to /var/run/dropbear
 # Remove it so overlays in that directory will work
-rm -f /etc/dropbear
-mkdir -p /etc/dropbear
+#rm -f /etc/dropbear
+#mkdir -p /etc/dropbear
 
 logger -s -t general_init "Setting up SDCard access"
 
@@ -36,7 +43,6 @@ setup_sdcard_access() {
 	rm /var/log
 	ln -s /sdcard/var/log /var/log
 }
-
 
 # Determine if sdcard access needs to be setup
 # On WyzeCam Pan units the /dev/mmcblk0p1 is available without having
@@ -60,21 +66,10 @@ else
 	fi;
 fi;
 
-
+# Not sure why this is needed, will remove later
 OPENMIKO_CONFIG_FILE=/sdcard/config/overlay/etc/openmiko.conf
 if [[ -f $OPENMIKO_CONFIG_FILE ]]; then
 	. $OPENMIKO_CONFIG_FILE
-fi
-
-logger -s -t general_init "Mounting flash partitions"
-
-mkdir -p /config
-mount -t jffs2 /dev/mtdblock3 /config
-
-if [ $? -ne 0 ]
-then
-	logger -s -t general_init "Error mounting /dev/mtdblock3 on /config"
-	exit 1
 fi
 
 clear_config_partition() {
@@ -82,22 +77,19 @@ clear_config_partition() {
 		echo "Wiping /config"
 		rm -rf /config/*
 		echo "Wipe complete. Make sure you remove the CLEAR_CONFIG_PARTITION flag."
-	fi	
+	fi
 }
 clear_config_partition
-
 
 # Should implement an optimization here to check for each file
 # so we don't wear out flash chip
 if [ -d "/sdcard/config" ]
 then
 	logger -s -t general_init "Copying files from sdcard to flash storage"
-	find /sdcard/config -type f -exec sh -c 'SOURCE={};TARGET=${SOURCE#/sdcard};install -D $SOURCE $TARGET' \; -print
+	#find /sdcard/config -type f -exec sh -c 'SOURCE={};TARGET=${SOURCE#/sdcard};install -D $SOURCE $TARGET' \; -print
+	# Workaround needed due to overlayfs issues
+	find /sdcard/config -type f -exec sh -c 'SOURCE={};TARGET=${SOURCE#/sdcard/config/overlay};echo $SOURCE $TARGET;cat $SOURCE > $TARGET' \; -print
+	logger -s -t general_init "Config copied from sdcard"
 fi
 
-logger -s -t general_init "Copying files from flash storage to ram"
-
-# Overlay the config flash with the rootfs in memory
-find /config/overlay -type f -exec sh -c 'SOURCE={};TARGET=${SOURCE#/config/overlay};install -D $SOURCE $TARGET' \; -print
-
-logger -s -t general_init "sdcard and config flash partition mounted"
+logger -s -t general_init "Genral Init done."
