@@ -16,6 +16,10 @@ TARGET_DIR=${TARGET_DIR:-/openmiko/build/buildroot-2016.02/output/target}
 #remove not needed modul. If the modul is disabled in the config, the other moduls are not built :(
 rm -rf "${TARGET_DIR}/lib/modules/3.10.14/kernel/drivers/net/wireless/rtl818x/rtl8188eu"
 
+#add missing sensor modul
+mkdir -p "${TARGET_DIR}/lib/modules/3.10.14/kernel/drivers/media/platform/sensors/jxf23"
+cp /src/external_moduls/sensor_jxf23.ko "${TARGET_DIR}/lib/modules/3.10.14/kernel/drivers/media/platform/sensors/jxf23/"
+
 # remove /var/log symlink. Due to overlayfs bug it is not possible to modify it. It is recreated on boot in the overlayfs
 rm -rf "${TARGET_DIR}/var/log"
 
