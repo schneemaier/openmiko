@@ -3,7 +3,7 @@
 	url = git@github.com:openmiko/buildroot_output.git
 [submodule "submodules/ingenic_videocap"]
 	path = submodules/ingenic_videocap
-	url = git@github.com:openmiko/ingenic_videocap.git
+	url = https://github.com/schneemaier/ingenic_videocap.git
 	ignore = dirty
 [submodule "submodules/v4l2rtspserver"]
 	path = submodules/v4l2rtspserver
